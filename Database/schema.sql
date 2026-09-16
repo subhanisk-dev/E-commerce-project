@@ -27,3 +27,4 @@ account_status enum('active','inactive','suspended'));
 desc admindata;
 desc userdata;
 
+select * from admindata;
