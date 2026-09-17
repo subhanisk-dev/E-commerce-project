@@ -19,6 +19,7 @@ useraddress text not null,
 userpassword varbinary(255) not null,
 userphone varchar(12) unique not null,
 usergender enum('female','male','others'),
+useragree enum('on','off'),
 otp char(6),
 otp_expiry_time datetime,
 account_status enum('active','inactive','suspended'));
