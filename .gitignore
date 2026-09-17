@@ -1,4 +1,4 @@
 Backend/__pycache__
 Backend/ecomenv
 Backend/.env
-
+Backend/flask_session

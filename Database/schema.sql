@@ -1,5 +1,4 @@
 create database ecomdb;
-
 use ecomdb;
 
 create table admindata(adminid binary(16) primary key,
@@ -24,7 +23,19 @@ otp char(6),
 otp_expiry_time datetime,
 account_status enum('active','inactive','suspended'));
 
+create table items(itemid binary(16) primary key,
+item_name longtext not null,
+item_desciption longtext,
+item_about longtext,
+item_price decimal(20,4) not null,
+item_stock bigint not null default 1,
+item_category enum('home_appliences','toys','electronics','sports','fashion','grocery'),
+item_image varchar(20) unique key not null,
+adminid binary(16) not null,
+foreign key(adminid) references admindata(adminid) on update cascade on delete cascade
+);
+
+
 desc admindata;
 desc userdata;
-
-select * from admindata;
+desc items;
