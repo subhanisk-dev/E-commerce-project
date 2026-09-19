@@ -6,11 +6,17 @@ from otp import generate_otp
 from cmail import send_mail
 from mysql.connector import connection
 from flask_bcrypt import Bcrypt
+from werkzeug.utils import secure_filename #It Remooves Unsafes characters from filename
 
 import os
 import datetime
 from dotenv import load_dotenv
 load_dotenv()
+
+#Finding path if present else creating folders
+base_dir=os.path.dirname(os.path.abspath('__file__'))
+upload_folder_path=os.path.join(base_dir,'static','uploads')
+os.makedirs(upload_folder_path,exist_ok=True)
 
 #Intializing App FLASK
 app=Flask(__name__)
@@ -36,6 +42,14 @@ app.config['SESSION_COOKIE_SECURE']=False
 
 #Intergrating Session with flask app
 Session(app)
+
+#Making That extension which file can stored in Files-Images
+Allowed_extensions={"jpg","jpeg","png","gif","webp"}
+max_length=6*1024*1021 #6 MB
+
+app.config['UPLOAD_FOLDER']=upload_folder_path
+app.config['ALLOWED_EXTENSION']=Allowed_extensions
+app.config['MAX_LENGTH']=max_length
 
 #DB CONNECTION
 mydb=connection.MySQLConnection(
@@ -203,6 +217,56 @@ def adminlogout():
     session.modified=True
     return jsonify({"status":"Success","message":"Logout SuccessFull"}),200
 
+def allowed_extensions(filename:str)->bool:
+    return '.' in filename and filename.rsplit('.',-1)[-1] in app.config['ALLOWED_EXTENSION']
+
+@app.route('/api/admin/additem',methods=['POST'])
+def additem():
+    cursor=None
+    try:
+        if not session.get('adminid'):
+            return jsonify({"status":"failed","message":"Admin have to Login TO Add Item"}),400
+        data=request.form
+        print(data)
+        if not data:
+            return jsonify({"status":"failed","message":"Data Must Be Send"}),400
+        item_name=data.get('title')
+        if not item_name:
+            return jsonify({"status":"failed","message":"Item must be Required"}),400
+        item_description=data.get('Description')
+        item_about=data.get('About_item')
+        item_quantity=data.get('quantity',0)
+        item_price=data.get('price')
+        if not item_price :
+            return jsonify({"status":"failed","message":"Item must be Required"}),400
+        try:
+            item_price=float(item_price)
+            item_quantity=int(item_quantity)
+        except ValueError:
+            return jsonify({"status":"failed","message":"Invalid type of price or Quantity"})
+        item_category=data.get('category','home_appliences')
+        item_filedata=request.files.get('file')
+        if not item_filedata:
+            return jsonify({"status":"failed","message":"Image Requreid"})
+        if not item_filedata.mimetype.startswith('image/'):
+            return jsonify({"status":"failed","message":"Image Type Required"})
+
+        item_filename=item_filedata.filename
+        if not allowed_extensions(item_filename):
+            return jsonify({"status":"failed","messagee":"File Extension Inavlid"}),400
+        sec_filename=secure_filename(item_filename)
+        ext=os.path.splitext(sec_filename)[1]
+        new_filename=generate_otp()+" "+sec_filename+ext
+        save_path=os.path.join(app.config['UPLOAD_FOLDER'],new_filename)
+        if save_path:
+            item_filedata.save(save_path)
+        return jsonify({"status":"success","message":"data accepted"}),200
+    except Exception as e:
+        print("Error:",e)
+        return jsonify({"status":"Failed","message":f"{str(e)}"}),500
+    finally:
+        if cursor:
+            cursor.close()
 
 #---------------------------------------------------------------------------------------------
 #----------------------------------USER PANEL-------------------------------------------------
