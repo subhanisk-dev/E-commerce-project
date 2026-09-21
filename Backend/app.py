@@ -256,17 +256,112 @@ def additem():
             return jsonify({"status":"failed","messagee":"File Extension Inavlid"}),400
         sec_filename=secure_filename(item_filename)
         ext=os.path.splitext(sec_filename)[1]
-        new_filename=generate_otp()+" "+sec_filename+ext
+        new_filename=generate_otp()+ext
         save_path=os.path.join(app.config['UPLOAD_FOLDER'],new_filename)
         if save_path:
+            mydb.ping(reconnect=True)
+            cursor=mydb.cursor(buffered=True)
+            cursor.execute('insert into items(itemid,item_name,item_descrption,item_about,item_price,item_stock,item_category,item_image,adminid) values (uuid_to_bin(uuid()),%s,%s,%s,%s,%s,%s,%s,uuid_to_bin(%s))',[item_name,item_description,item_about,item_price,item_quantity,item_category,new_filename,session.get('adminid')])
             item_filedata.save(save_path)
-        return jsonify({"status":"success","message":"data accepted"}),200
+            mydb.commit()
+            return jsonify({"status":"success","message":"data accepted"}),200
+        else:
+            print("Save Path Not Found")
+            return jsonify({"status":"failed","message":"Save Path Error"})
     except Exception as e:
+        mydb.rollback()
         print("Error:",e)
         return jsonify({"status":"Failed","message":f"{str(e)}"}),500
     finally:
         if cursor:
             cursor.close()
+
+@app.route('/api/admin/viewallitems',methods=['GET'])
+def viewallitems():
+    cursor=None
+    try:
+        adminid=session.get('adminid')
+        if not adminid:
+            return jsonify({"status":"failed","message":"Admin have to Login TO Add Item"}),400
+        mydb.ping(reconnect=True)
+        cursor=mydb.cursor(buffered=True)
+        cursor.execute('select bin_to_uuid(itemid),item_name,item_descrption,item_about,item_price,item_stock,item_category,item_image from items where adminid=uuid_to_bin(%s)',[adminid])
+        items_data=cursor.fetchall()
+        if not items_data:
+            return jsonify({"status":"failed","message":"Pls Add item to view"}),404
+        products=[]
+        for item in items_data:
+            products.append({'itemid':item[0],'itemname':item[1],'item_desc':item[2],'item_about':item[3],
+                             'item_price':item[4],'quantity':item[5],'category':item[6],
+                             'image':url_for('static',filename=f"uploads/{item[7]}",external=True)
+                             })
+        return jsonify({"status":"success","message":"Successfully fetched all items",'products':products}),200
+    except Exception as e:
+        mydb.rollback()
+        print("Error:",e)
+        return jsonify({"status":"Failed","message":f"{str(e)}"}),500
+    finally:
+        if cursor:
+            cursor.close()
+
+@app.route('/api/admin/viewitems/<itemid>',methods=['GET'])
+def viewitems(itemid):
+    cursor=None
+    try:
+        adminid=session.get('adminid')
+        if not adminid:
+            return jsonify({"status":"failed","message":"Admin have to Login TO Add Item"}),400
+        mydb.ping(reconnect=True)
+        cursor=mydb.cursor(buffered=True)
+        cursor.execute('select item_name,item_descrption,item_about,item_price,item_stock,item_category,item_image from items where adminid=uuid_to_bin(%s) and itemid=uuid_to_bin(%s)',[adminid,itemid])
+        items_data=cursor.fetchone()
+        if not items_data:
+            return jsonify({"status":"failed","message":"Pls Add item to view"}),404
+        product=[]
+        product.append({'itemname':items_data[0],'item_desc':items_data[1],
+                         'item_about':items_data[2],'item_price':items_data[3],
+                         'quantity':items_data[4],'category':items_data[5],
+                         'image':url_for('static',filename=f"uploads/{items_data[6]}",external=True)
+                             })
+        return jsonify({"status":"success","message":"Successfully fetched all items",'product':product}),200
+    except Exception as e:
+        mydb.rollback()
+        print("Error:",e)
+        return jsonify({"status":"Failed","message":f"{str(e)}"}),500
+    finally:
+        if cursor:
+            cursor.close()
+
+@app.route('/api/admin/deleteitem/<itemid>',methods=['DELETE'])
+def deleteitem(itemid):
+    cursor=None
+    try:
+        adminid=session.get('adminid')
+        if not adminid:
+            return jsonify({"status":"failed","message":"Admin have to Login TO Add Item"}),401
+        mydb.ping(reconnect=True)
+        cursor=mydb.cursor(buffered=True)
+        cursor.execute('select item_image from items where adminid=uuid_to_bin(%s) and itemid=uuid_to_bin(%s)',[adminid,itemid])
+        item_data=cursor.fetchone()
+        if not item_data:
+            return jsonify({"status":"failed","message":"Item Not Found"}),404
+        remove_path=os.path.join(app.config['UPLOAD_FOLDER'],item_data[0])
+        cursor.execute('delete from items where adminid=uuid_to_bin(%s) and itemid=uuid_to_bin(%s)',
+                       [adminid,itemid] )
+        try:
+            os.remove(remove_path)
+        except FileNotFoundError:
+            return jsonify({"status":"failed","message":"File Not Found"}),400
+        mydb.commit()
+        return jsonify({"status":"success","message":"Deleted Successfully",}),200
+    except Exception as e:
+        mydb.rollback()
+        print("Error:",e)
+        return jsonify({"status":"Failed","message":f"{str(e)}"}),500
+    finally:
+        if cursor:
+            cursor.close()
+
 
 #---------------------------------------------------------------------------------------------
 #----------------------------------USER PANEL-------------------------------------------------

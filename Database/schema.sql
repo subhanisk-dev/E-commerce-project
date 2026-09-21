@@ -26,7 +26,7 @@ account_status enum('active','inactive','suspended'));
 
 create table items(itemid binary(16) primary key,
 item_name longtext not null,
-item_desciption longtext,
+item_descrption longtext,
 item_about longtext,
 item_price decimal(20,4) not null,
 item_stock bigint not null default 1,
@@ -40,3 +40,6 @@ foreign key(adminid) references admindata(adminid) on update cascade on delete c
 desc admindata;
 desc userdata;
 desc items;
+
+select * from items;
+select * from admindata;
