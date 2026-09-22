@@ -362,6 +362,154 @@ def deleteitem(itemid):
         if cursor:
             cursor.close()
 
+@app.route('/api/admin/updateitem/<itemid>',methods=['PUT'])
+def updateitem(itemid):
+    cursor=None
+    try:
+        adminid=session.get('adminid')
+        if not adminid:
+            return jsonify({"status":"failed","message":"Pls Login First"}),400
+        mydb.ping(reconnect=True)
+        cursor=mydb.cursor(buffered=True)
+        cursor.execute('select bin_to_uuid(itemid),item_name,item_descrption,item_about,item_price,item_stock,item_category,item_image from items where adminid=uuid_to_bin(%s) and itemid=uuid_to_bin(%s)',[adminid,itemid])
+        item_data=cursor.fetchone()
+        if not item_data:
+            return jsonify({"status":"failed","message":"Item Not Found"}),404
+
+        #Accepting Data From User
+        data=request.form
+        print(data) #ductionary fromat
+        if not data:
+            return jsonify({"status":"failed","message":"Data Must Be Send"}),400
+        update_item_name=data.get('title')
+        if not update_item_name:
+            return jsonify({"status":"failed","message":"Item must be Required"}),400
+        update_item_description=data.get('Description')
+        update_item_about=data.get('About_item')
+        update_item_quantity=data.get('quantity',0)
+        update_item_price=data.get('price')
+        if not update_item_price:
+            return jsonify({"status":"failed","message":"Item Price must be Required"}),400
+        try:
+            update_item_price=float(update_item_price)
+            update_item_quantity=int(update_item_quantity)
+        except ValueError:
+            return jsonify({"status":"failed","message":"Invalid type of price or Quantity"})
+        update_item_category=data.get('category','home_appliences')
+        filename=item_data[7]
+        old_image=item_data[7]
+
+        updateditem_filedata=request.files.get('file')
+        print(updateditem_filedata)
+        if updateditem_filedata:
+            if not  updateditem_filedata.mimetype.startswith('image/'):
+                return jsonify({"status":"failed","message":"file type is invalid"})
+            updateditem_filename=updateditem_filedata.filename
+            if not allowed_extensions(updateditem_filename):
+                return jsonify({"status":"failed","message":"file extension invalid"})
+            sec_filename=secure_filename(updateditem_filename) #'anusharesume.txt'
+            ext=os.path.splitext(sec_filename)[1]
+            filename=generate_otp()+ext #'F6bD7m.jpg'
+            save_path=os.path.join(app.config['UPLOAD_FOLDER'],filename)
+            try:
+                updateditem_filedata.save(save_path)    
+            except Exception as e:
+                return jsonify({"status":"failed","message":f"{str(e)}"})
+        cursor.execute('update items set item_name=%s,item_descrption=%s,item_about=%s,item_price=%s,item_stock=%s,item_category=%s,item_image=%s where adminid=uuid_to_bin(%s) and itemid=uuid_to_bin(%s)',[update_item_name,update_item_description,update_item_about,update_item_price,update_item_quantity,update_item_category,filename,adminid,itemid])
+        mydb.commit()
+        old_image_path=os.path.join(app.config['UPLOAD_FOLDER'],old_image)
+        if updateditem_filedata and os.path.exists(old_image_path):
+            if old_image_path:
+                os.remove(old_image_path)
+        return jsonify({"status":"success","message":"item updated successfully"})
+    except Exception as e:
+        mydb.rollback()
+        print("Error:",e)
+        return jsonify({"status":"Failed","message":f"{str(e)}"}),500
+    finally:
+        if cursor:
+            cursor.close()
+
+@app.route('/api/admin/profile',methods=['PUT'])
+def adminprofileupdate():
+    cursor=None
+    try:
+        adminid=session.get('adminid')
+        adminemail=session.get('admin_email')
+        if not adminid:
+            return jsonify({"status":"failed","message":"Admin Have to login To update"}),400
+        mydb.ping(reconnect=True)
+        cursor=mydb.cursor(buffered=True)
+        cursor.execute('select account_status,bin_to_uuid(adminid),admin_name,admin_email,admin_address,admin_password,admin_agree,admin_image from admindata where adminid=uuid_to_bin(%s)',[adminid])
+        admindata=cursor.fetchone()
+        if admindata[0] in ['inactive','suspended']:
+            return jsonify({"status":"failed","message":"User Is either INACTIVE or SUSPENDED"}),400
+        print(request.form)
+        data=request.form
+        if not data:
+            return jsonify({"status":"failed","message":"No Input Data given"}),400
+        update_adminid=data.get('id')
+        if update_adminid:
+            return jsonify({"status":"failed","message":"admin Id cannot be changed"})
+        update_adminname=data.get('username')
+        if not update_adminname:
+            return jsonify({"status":"failed","message":"Email And Username Required"})
+        update_adminemail=data.get('useremail')
+        if update_adminemail:
+            return jsonify({"status":"failed","message":"Email address Cannot Be changed"})
+
+        adminpassword=admindata[5]
+        update_adminpassword=data.get('password')
+        if update_adminpassword:
+            if len(update_adminpassword)<6:
+                return jsonify({"status":"failed","meassge":"Password is too short"})
+            hash_password=bcrypt.generate_password_hash(update_adminpassword).decode('utf-8')
+            adminpassword=hash_password
+
+        update_adminaddress=data.get('useraddress')
+        if not update_adminaddress:
+            return jsonify({"status":"failed","meassage":"Address is Required"})
+        update_adminagree=data.get('agree','off')
+
+        old_adminimage=admindata[7]
+        adminimage=admindata[7]
+        admin_filedata=request.files.get('file')
+        print(admin_filedata)
+        if admin_filedata:
+            if not  admin_filedata.mimetype.startswith('image/'):
+                return jsonify({"status":"failed","message":"file type is invalid"})
+            admin_filename=admin_filedata.filename
+            if not allowed_extensions(admin_filename):
+                return jsonify({"status":"failed","message":"file extension invalid"})
+            sec_filename=secure_filename(admin_filename) #'anusharesume.txt'
+            ext=os.path.splitext(sec_filename)[1]
+            adminimage=generate_otp()+ext #'F6bD7m.jpg'
+            save_path=os.path.join(app.config['UPLOAD_FOLDER'],adminimage)
+            try:
+                admin_filedata.save(save_path)    
+            except Exception as e:
+                return jsonify({"status":"failed","message":f"{str(e)}"})
+
+        #DB Storing
+        cursor.execute('update admindata set admin_name=%s,admin_address=%s,admin_password=%s,admin_agree=%s,admin_image=%s where adminid=uuid_to_bin(%s) and admin_email=%s',[update_adminname,update_adminaddress,adminpassword,update_adminagree,adminimage,adminid,adminemail])
+        mydb.commit()
+
+        if old_adminimage:
+            old_image_path=os.path.join(app.config['UPLOAD_FOLDER'],old_adminimage)
+            if admin_filedata and os.path.exists(old_image_path):
+                if old_image_path:
+                    os.remove(old_image_path)
+
+        return jsonify({"status":"success","message":"item updated successfully"})
+        
+    except Exception as e:
+        mydb.rollback()
+        print("Error:",e)
+        return jsonify({"status":"Failed","message":f"{str(e)}"}),500
+    finally:
+        if cursor:
+            cursor.close()
+
 
 #---------------------------------------------------------------------------------------------
 #----------------------------------USER PANEL-------------------------------------------------
