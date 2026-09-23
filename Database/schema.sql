@@ -36,10 +36,22 @@ adminid binary(16) not null,
 foreign key(adminid) references admindata(adminid) on update cascade on delete cascade
 );
 
+create table cart(cartid binary(16) primary key,
+itemid binary(16) not null,
+userid binary(16) not null,
+quantity int default 1,
+foreign key (itemid) references items(itemid) ,
+foreign key (userid) references userdata(userid)
+);
 
 desc admindata;
 desc userdata;
 desc items;
+desc cart;
 
 select * from items;
 select * from admindata;
+select * from userdata;
+select * from cart;
+
+

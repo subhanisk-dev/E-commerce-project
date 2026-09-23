@@ -3,3 +3,4 @@ flask_session
 python-dotenv
 mysql-connector-python
 flask_bcrypt
+flask_cors
