@@ -14,7 +14,7 @@ function Cart() {
     try {
       setLoading(true);
       const res = await axios.get(
-        "http://127.0.0.1:5000/api/cart/view",
+        "http://localhost:5000/api/cart/view",
         { withCredentials: true }
       );
       setCartItems(res.data.cart_items || []);
@@ -37,7 +37,7 @@ function Cart() {
     if (quantity <= 0) return;
     try {
       await axios.put(
-        "http://127.0.0.1:5000/api/cart/update",
+        "http://localhost:5000/api/cart/update",
         { itemid, quantity },
         { withCredentials: true }
       );
@@ -50,7 +50,7 @@ function Cart() {
   async function removeItem(itemid) {
     try {
       await axios.delete(
-        `http://127.0.0.1:5000/api/cart/remove/${itemid}`,
+        `http://localhost:5000/api/cart/remove/${itemid}`,
         { withCredentials: true }
       );
       fetchCart();

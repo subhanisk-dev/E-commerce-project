@@ -11,7 +11,7 @@ function AdminProducts() {
     try {
 
       const res = await axios.get(
-        "http://127.0.0.1:5000/api/admin/items",
+        "http://localhost:5000/api/admin/items",
         {
           withCredentials: true
         }
@@ -29,7 +29,7 @@ function AdminProducts() {
     try {
 
       const res = await axios.delete(
-        `http://127.0.0.1:5000/api/admin/delete-item/${id}`,
+        `http://localhost:5000/api/admin/delete-item/${id}`,
         {
           withCredentials: true
         }

@@ -726,7 +726,7 @@ def addcart():
     cursor=None
     try:
         if not session.get('userid'):
-            return jsonify({"status":"failed","message":"Pls login to add cart item"}),400
+            return jsonify({"status":"failed","message":"Pls login to add cart item"}),401
         data=request.get_json() 
         if not data:
             return  jsonify({"status":"failed","message":"No input data given"}),400
@@ -770,15 +770,105 @@ def addcart():
 
 @app.route('/api/cart/view')
 def viewcart():
-    #Dummy
-    print("Its View Cart")
+    cursor=None
+    try:
+        userid=session.get('userid')
+        if not userid:
+            return jsonify({"status":"failed","message":"Pls Login To view Cart"}),401
+        mydb.ping(reconnect=True)
+        cursor=mydb.cursor(buffered=True)
+        cursor.execute('select bin_to_uuid(i.itemid),i.item_name,i.item_descrption,i.item_price,c.quantity,i.item_category,i.item_image from items i join cart c on i.itemid=c.itemid where c.userid=uuid_to_bin(%s)',[userid])
+        cart_items=cursor.fetchall()
+        print(cart_items)
+        if not cart_items:
+            return jsonify({"status":"failed","message":"Cart is Empty"}),401
+        items_data=[]
+        subtotal=0
+        for item in cart_items:
+            itemid=item[0]
+            itemname=item[1]
+            price=float(item[3])
+            quantity=int(item[4])
+            category=item[5]
+            image=url_for('static',filename=f"uploads/{item[6]}",_external=True)
+            amount=price*quantity
+            subtotal+=amount
+            items_data.append({"itemid":itemid,
+                               "itemname":itemname,
+                               "price":price,
+                               "quantity":quantity,
+                               "category":category,
+                               "image":image,
+                               "total":amount
+                               })
+
+        delivery=40
+        tax=round(subtotal*0.05,2)
+        grand_total=amount+delivery+tax
+        summary={"subtotal":subtotal,"delivery":delivery,"grand_total":grand_total,"tax":tax}
+
+        return jsonify({"status":"success","message":"Cart Viewing SuccessFully","summary":summary,"cart_items":items_data}),200
+    except Exception as e:
+            mydb.rollback()
+            print('Error:',str(e))
+            return jsonify({"status":"failed","message":f"{str(e)}"}),500
+    finally:
+        if cursor:
+            cursor.close()
+
     return jsonify({"status":"success","message":"VIewing Cart"}),200
 
 @app.route('/api/cart/update',methods=['PUT'])
 def updatecart():
-    #Dummy
-    print("Update Cart")
-    return jsonify({"status":"success","message":"Updating Cart"}),200
+    cursor=None
+    try:
+        userid=session.get('userid')
+        if not userid:
+            return jsonify({"status":"failed","message":"Pls Login To view Cart"}),401
+        data=request.get_json()
+        if not data:
+            return jsonify({"status":"failed","message":"No Input Given"}),400
+        itemid=data.get('itemid')
+        update_quantity=data.get('quantity',1) 
+        if not itemid:
+            return jsonify({"status":"failed","message":"itemid required"}),400
+
+        mydb.ping(reconnect=True)
+        cursor=mydb.cursor(buffered=True)
+        cursor.execute('select item_stock from items where itemid=uuid_to_bin(%s)',[itemid])
+        item_data=cursor.fetchone()
+        #checking item in db
+        if not item_data:
+            return jsonify({"status":"failed","message":"Item not found in DB"}),400
+        #stock validation
+        if item_data[0]<update_quantity:
+            return jsonify({"status":"failed","message":"item quantity exceeded than stock quantity"}),400
+        if item_data[0]==0:
+            return jsonify({"status":"failed","message":"Item out of stock"}),400
+        
+        #validation to check item already in cart
+        cursor.execute('select quantity from cart where itemid=uuid_to_bin(%s) and userid=uuid_to_bin(%s)',[itemid,userid])
+        cart_item=cursor.fetchone()
+        
+        if cart_item:
+            new_quantity=cart_item[0]+update_quantity
+            if new_quantity>item_data[0]:
+                return jsonify({"status":"failed","message":"Item quantity exceeded than stock"})
+            cursor.execute('update cart set quantity=quantity+%s where itemid=uuid_to_bin(%s)and userid=uuid_to_bin(%s)',[update_quantity,itemid,userid])
+            message='Cart item updated successfully'
+        else:
+            message='Item Not Found'
+        mydb.commit()
+
+        return jsonify({"status":"success","message":message}),200
+        
+    except Exception as e:
+            mydb.rollback()
+            print('Error:',str(e))
+            return jsonify({"status":"failed","message":f"{str(e)}"}),500
+    finally:
+        if cursor:
+            cursor.close()
 
 @app.route('/api/cart/remove/<itemid>',methods=['DELETE'])
 def deletecart(itemid):
@@ -817,8 +907,6 @@ def inovice():
     #Dummy
     print("Delete An item in Cart")
     return jsonify({"status":"success","message":"Deleting Cart"}),200
-
-
 
 
 @app.errorhandler(413)

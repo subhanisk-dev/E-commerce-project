@@ -37,8 +37,8 @@ if (!tokenFromRegister) {
   try {
     const url =
       role === "admin"
-        ? "https://ecomreact.duckdns.org/api/admin/verify-otp"
-        : "https://ecomreact.duckdns.org/api/user/verify-otp";
+        ? "http://localhost:5000/api/admin/verify-otp"
+        : "http://localhost:5000/api/user/verify-otp";
 
     const payload = {
       otp: otpData.otp,

@@ -15,7 +15,7 @@ function MyOrders() {
     async function fetchOrders() {
         try {
             const res = await axios.get(
-                "http://127.0.0.1:5000/api/myorders",
+                "http://localhost:5000/api/myorders",
                 {
                     withCredentials: true
                 }
