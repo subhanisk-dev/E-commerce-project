@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 function AdminProducts() {
 
   const [products, setProducts] = useState([]);
+  const [message, setMessage] = useState("");
   const navigate = useNavigate();
 
   async function getProducts() {
@@ -17,11 +18,43 @@ function AdminProducts() {
         }
       );
 
-      setProducts(res.data.products || res.data);
+      console.log("Admin Products Response:", res.data);
+
+      if (res.data.status === "success") {
+        setProducts(res.data.products || []);
+        setMessage("");
+      } else {
+        setProducts([]);
+        setMessage(
+          res.data.message || "No products found. Please add a product."
+        );
+      }
 
     } catch (error) {
-      console.log(error.response?.data || error.message);
-      navigate("/login");
+
+      console.log(
+        error.response?.data || error.message
+      );
+
+      if (error.response?.status === 404) {
+        setProducts([]);
+        setMessage(
+          error.response?.data?.message ||
+          "Pls Add item to view"
+        );
+        return;
+      }
+
+      if (error.response?.status === 401) {
+        navigate("/login");
+        return;
+      }
+
+      setProducts([]);
+      setMessage(
+        error.response?.data?.message ||
+        "Something went wrong while fetching products."
+      );
     }
   }
 
@@ -40,7 +73,9 @@ function AdminProducts() {
       getProducts();
 
     } catch (error) {
-      console.log(error.response?.data || error.message);
+      console.log(
+        error.response?.data || error.message
+      );
     }
   }
 
@@ -51,8 +86,6 @@ function AdminProducts() {
   return (
     <>
       
-
-      {/* CUSTOM STYLE */}
       <style>{`
         .products-page{
           min-height: 100vh;
@@ -135,6 +168,44 @@ function AdminProducts() {
           color: white;
         }
 
+        .empty-products{
+          max-width: 600px;
+          margin: 80px auto;
+          background: white;
+          border-radius: 18px;
+          padding: 50px 30px;
+          text-align: center;
+          box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+        }
+
+        .empty-products h2{
+          font-size: 30px;
+          font-weight: bold;
+          color: #0f172a;
+          margin-bottom: 15px;
+        }
+
+        .empty-products p{
+          color: #64748b;
+          margin-bottom: 25px;
+        }
+
+        .add-product-btn{
+          display: inline-block;
+          background: #0ea5e9;
+          color: white;
+          padding: 12px 22px;
+          border-radius: 8px;
+          text-decoration: none;
+          font-weight: 500;
+          transition: 0.3s;
+        }
+
+        .add-product-btn:hover{
+          background: #0284c7;
+          color: white;
+        }
+
         @media(max-width:768px){
           .page-title{
             font-size: 32px;
@@ -152,68 +223,99 @@ function AdminProducts() {
           Admin Products
         </h1>
 
-        <div className="container">
-          <div className="row g-4">
+        {products.length === 0 ? (
 
-            {products.map((item) => (
-              
-              <div
-                className="col-12 col-sm-6 col-lg-4"
-                key={item.itemid}
-              >
-                <div className="product-card">
+          <div className="empty-products">
 
-<img
-  src={item.image}
-  alt={item.itemname}
-  className="product-img"
-/>
-                  <div className="product-body">
+            <h2>
+              No Products Found
+            </h2>
 
-                    <h2 className="product-title">
-                      {item.itemname}
-                    </h2>
+            <p>
+              You haven't added any products yet.
+              <br />
+              Add your first product to see it here.
+            </p>
 
-                    <p className="product-desc">
-                      {item.item_desc}
-                    </p>
-
-                    <h3 className="product-price">
-                      ₹{item.price}
-                    </h3>
-
-                    <div className="d-flex gap-2 mt-4 flex-wrap">
-
-                      <Link
-                        to={`/single/${item.itemid}`}
-                        className="btn-custom view-btn"
-                      >
-                        View
-                      </Link>
-
-                      <Link
-                        to={`/edit/${item.itemid}`}
-                        className="btn-custom edit-btn"
-                      >
-                        Edit
-                      </Link>
-
-                      <button
-                        className="btn-custom delete-btn"
-                        onClick={() => deleteProduct(item.itemid)}
-                      >
-                        Delete
-                      </button>
-
-                    </div>
-
-                  </div>
-                </div>
-              </div>
-            ))}
+            <Link
+              to="/add-product"
+              className="add-product-btn"
+            >
+              + Add Product
+            </Link>
 
           </div>
-        </div>
+
+        ) : (
+
+          <div className="container">
+            <div className="row g-4">
+
+              {products.map((item) => (
+
+                <div
+                  className="col-12 col-sm-6 col-lg-4"
+                  key={item.itemid}
+                >
+
+                  <div className="product-card">
+
+                    <img
+                      src={item.image}
+                      alt={item.itemname}
+                      className="product-img"
+                    />
+
+                    <div className="product-body">
+
+                      <h2 className="product-title">
+                        {item.itemname}
+                      </h2>
+
+                      <p className="product-desc">
+                        {item.item_desc}
+                      </p>
+
+                      <h3 className="product-price">
+                        ₹{item.price}
+                      </h3>
+
+                      <div className="d-flex gap-2 mt-4 flex-wrap">
+
+                        <Link
+                          to={`/single/${item.itemid}`}
+                          className="btn-custom view-btn"
+                        >
+                          View
+                        </Link>
+
+                        <Link
+                          to={`/edit/${item.itemid}`}
+                          className="btn-custom edit-btn"
+                        >
+                          Edit
+                        </Link>
+
+                        <button
+                          className="btn-custom delete-btn"
+                          onClick={() => deleteProduct(item.itemid)}
+                        >
+                          Delete
+                        </button>
+
+                      </div>
+
+                    </div>
+                  </div>
+
+                </div>
+
+              ))}
+
+            </div>
+          </div>
+
+        )}
 
       </div>
     </>

@@ -53,5 +53,3 @@ select * from items;
 select * from admindata;
 select * from userdata;
 select * from cart;
-
-

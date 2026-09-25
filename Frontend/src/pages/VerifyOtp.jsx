@@ -6,11 +6,11 @@ function VerifyOtp() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const tokenFromRegister = location.state?.token || "";
+  const emailFromRegister = location.state?.email || "";
 const role = location.state?.role || "user";
   const [otpData, setOtpData] = useState({
     otp: "",
-    token: tokenFromRegister,
+    email: emailFromRegister,
   });
 
   const [message, setMessage] = useState("");
@@ -22,7 +22,7 @@ const role = location.state?.role || "user";
       [e.target.name]: e.target.value,
     });
   }
-if (!tokenFromRegister) {
+if (!emailFromRegister) {
   return (
     <div className="container mt-5">
       <div className="alert alert-danger">
@@ -42,7 +42,7 @@ if (!tokenFromRegister) {
 
     const payload = {
       otp: otpData.otp,
-      token: otpData.token
+      email: otpData.email
     };
 
     const res = await axios.post(

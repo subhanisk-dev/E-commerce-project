@@ -125,7 +125,7 @@ def admincreate():
         print("Error:",e)
         return jsonify({"status":"Failed","message":f"{str(e)}"}),500
     
-@app.route('/api/admin/otpverify',methods=['POST'])
+@app.route('/api/admin/verify-otp',methods=['POST'])
 def admin_otpverify():
     cursor=None
     try:
@@ -145,7 +145,7 @@ def admin_otpverify():
         response=cursor.fetchone()
         if response:
             if response[0]=='active':
-                return jsonify({"status":"success","meassage":"User Already verified"}),200
+                return jsonify({"status":"success","message":"User Already verified"}),200
             elif response[0]=='inactive':
                 cursor.execute('select otp,otp_expiry_time from admindata where admin_email=%s',[user_email])
                 mysql_response=cursor.fetchone()
@@ -154,18 +154,18 @@ def admin_otpverify():
                 if not mysql_response[1]:
                     return jsonify({"status":"failed","message":"OTP expired"}),400
                 if user_otp_time>mysql_response[1]:
-                    return jsonify({"status":"failed","meassage":"otp expired"}),400
+                    return jsonify({"status":"failed","message":"otp expired"}),400
                 else:
                     if mysql_response[0]==user_otp:
                         cursor.execute('update admindata set otp=null,otp_expiry_time=null,account_status="active" where admin_email=%s',[user_email])
                         mydb.commit()
-                        return jsonify({"status":"success","meassage":"OTP Verifeed successfully"}),200
+                        return jsonify({"status":"success","message":"OTP Verifeed successfully"}),200
                     else:
                         return jsonify({"status":"failed","message":"Otp Incorrect"}),400
             elif response[0]=='suspended':
-                return jsonify({"status":"success","meassage":"User Susspended"}),403
+                return jsonify({"status":"success","message":"User Susspended"}),403
         else:
-            return jsonify({"status":"failed","meassage":"User Not Found"}),404
+            return jsonify({"status":"failed","message":"User Not Found"}),404
 
     except Exception as e:
         print("Error:",e)
@@ -198,14 +198,14 @@ def adminlogin():
         if response[0]=='suspended':
             return jsonify({"status":"failed","message":"Account Suspended"}),403
         if response[0]=='active':
-            cursor.execute('select admin_password,bin_to_uuid(adminid) from admindata where admin_email=%s',[user_email])
+            cursor.execute('select admin_password,bin_to_uuid(adminid),admin_name from admindata where admin_email=%s',[user_email])
             db_response=cursor.fetchone()
             if bcrypt.check_password_hash(db_response[0],user_password):
                 session['adminid']=db_response[1]
                 session['admin_email']=user_email
                 session.permanent=True
                 return jsonify({"status":"success","message":"Login SuccessFull",
-                                "admin":{"adminid":session['adminid'],"adminemail":session['admin_email']}
+                                "admin":{"adminid":session['adminid'],"adminemail":session['admin_email'],"adminname":db_response[2]}
                                 }),200
             else:
                 return jsonify({"status":"failed","message":"Email or Password Incorrect"}),401
@@ -305,7 +305,7 @@ def viewallitems():
         for item in items_data:
             products.append({'itemid':item[0],'itemname':item[1],'item_desc':item[2],'item_about':item[3],
                              'price':item[4],'quantity':item[5],'category':item[6],
-                             'image':url_for('static',filename=f"uploads/{item[7]}",external=True)
+                             'image':url_for('static',filename=f"uploads/{item[7]}",_external=True)
                              })
         return jsonify({"status":"success","message":"Successfully fetched all items",'products':products}),200
     except Exception as e:
@@ -334,7 +334,7 @@ def viewitems(id):
         product={'itemname':items_data[0],'item_desc':items_data[1],
                          'item_about':items_data[2],'price':items_data[3],
                          'quantity':items_data[4],'category':items_data[5],
-                         'image':url_for('static',filename=f"uploads/{items_data[6]}",external=True)
+                         'image':url_for('static',filename=f"uploads/{items_data[6]}",_external=True)
                              }
         return jsonify({"status":"success","message":"Successfully fetched all items",'product':product}),200
     except Exception as e:
@@ -592,7 +592,7 @@ def userregister():
         print("Error:",e)
         return jsonify({"status":"Failed","message":f"{str(e)}"}),500
 
-@app.route('/api/user/otpverify',methods=['POST'])
+@app.route('/api/user/verify-otp',methods=['POST'])
 def user_otpverify():
     cursor=None
     try:
@@ -612,25 +612,25 @@ def user_otpverify():
         response=cursor.fetchone()
         if response:
             if response[0]=='active':
-                return jsonify({"status":"success","meassage":"User Already verified"}),200
+                return jsonify({"status":"success","message":"User Already verified"}),200
             elif response[0]=='inactive':
                 cursor.execute('select otp,otp_expiry_time from userdata where useremail=%s',[user_email])
                 mysql_response=cursor.fetchone()
                 if not mysql_response:
                     return jsonify({"status":"failed","message":"OTP information Not Found"}),400
                 if user_otp_time>mysql_response[1]:
-                    return jsonify({"status":"failed","meassage":"otp expired"}),400
+                    return jsonify({"status":"failed","message":"otp expired"}),400
                 else:
                     if mysql_response[0]==user_otp:
                         cursor.execute('update userdata set otp=null,otp_expiry_time=null,account_status="active" where useremail=%s',[user_email])
                         mydb.commit()
-                        return jsonify({"status":"success","meassage":"OTP Verifed successfully"}),200
+                        return jsonify({"status":"success","message":"OTP Verifed successfully"}),200
                     else:
                         return jsonify({"status":"failed","message":"Otp Incorrect"}),400
             elif response[0]=='suspended':
-                return jsonify({"status":"success","meassage":"User Susspended"}),400
+                return jsonify({"status":"success","message":"User Susspended"}),400
         else:
-            return jsonify({"status":"failed","meassage":"User Not Found"}),400
+            return jsonify({"status":"failed","message":"User Not Found"}),400
 
     except Exception as e:
         print("Error:",e)
@@ -727,14 +727,15 @@ def addcart():
     try:
         if not session.get('userid'):
             return jsonify({"status":"failed","message":"Pls login to add cart item"}),401
-        data=request.get_json() 
+        data=request.get_json()
+        print(data)
         if not data:
             return  jsonify({"status":"failed","message":"No input data given"}),400
         itemid=data.get('itemid')
         if not itemid:
             return jsonify({"status":"failed","message":"Item ID is Required"}),400
         try:
-            quantity=int(data.get('quantity',1))
+            quantity=int(data.get('quantity'))
         except (ValueError,TypeError):
             return jsonify({"status":"failed","message":"Qunatity must be a number"}),400
         mydb.ping(reconnect=True)
@@ -753,7 +754,7 @@ def addcart():
         cursor.execute('select quantity from cart where itemid=uuid_to_bin(%s) and userid=uuid_to_bin(%s)',[itemid,session.get('userid')])
         cart_item=cursor.fetchone()
         if cart_item:
-            cursor.execute('update cart set quantity=%s where itemid=uuid_to_bin(%s)and userid=uuid_to_bin(%s)',[quantity,itemid,session.get('userid')])
+            cursor.execute('update cart set quantity=%s where itemid=uuid_to_bin(%s)and userid=uuid_to_bin(%s)',[quantity+cart_item[0],itemid,session.get('userid')])
             message='Cart item updated successfully'
         else:
             cursor.execute('insert into cart(cartid,quantity,itemid,userid) values(uuid_to_bin(uuid()),%s,uuid_to_bin(%s),uuid_to_bin(%s))',[quantity,itemid,session.get('userid')])
@@ -804,7 +805,7 @@ def viewcart():
 
         delivery=40
         tax=round(subtotal*0.05,2)
-        grand_total=amount+delivery+tax
+        grand_total=subtotal+delivery+tax
         summary={"subtotal":subtotal,"delivery":delivery,"grand_total":grand_total,"tax":tax}
 
         return jsonify({"status":"success","message":"Cart Viewing SuccessFully","summary":summary,"cart_items":items_data}),200
@@ -816,7 +817,6 @@ def viewcart():
         if cursor:
             cursor.close()
 
-    return jsonify({"status":"success","message":"VIewing Cart"}),200
 
 @app.route('/api/cart/update',methods=['PUT'])
 def updatecart():
@@ -826,10 +826,11 @@ def updatecart():
         if not userid:
             return jsonify({"status":"failed","message":"Pls Login To view Cart"}),401
         data=request.get_json()
+        print(data)
         if not data:
             return jsonify({"status":"failed","message":"No Input Given"}),400
         itemid=data.get('itemid')
-        update_quantity=data.get('quantity',1) 
+        update_quantity=data.get('quantity') 
         if not itemid:
             return jsonify({"status":"failed","message":"itemid required"}),400
 
@@ -854,7 +855,7 @@ def updatecart():
             new_quantity=cart_item[0]+update_quantity
             if new_quantity>item_data[0]:
                 return jsonify({"status":"failed","message":"Item quantity exceeded than stock"})
-            cursor.execute('update cart set quantity=quantity+%s where itemid=uuid_to_bin(%s)and userid=uuid_to_bin(%s)',[update_quantity,itemid,userid])
+            cursor.execute('update cart set quantity=%s where itemid=uuid_to_bin(%s)and userid=uuid_to_bin(%s)',[update_quantity,itemid,userid])
             message='Cart item updated successfully'
         else:
             message='Item Not Found'
@@ -872,33 +873,58 @@ def updatecart():
 
 @app.route('/api/cart/remove/<itemid>',methods=['DELETE'])
 def deletecart(itemid):
-    #Dummy
-    print("Delete An item in Cart")
-    return jsonify({"status":"success","message":"Deleting Cart"}),200
+    cursor=None
+    try:
+        userid=session.get('userid')
+        if not userid:
+            return jsonify({"status":"failed","message":"Pls Login To view Cart"}),401
+
+        #DB Checking 
+        mydb.ping(reconnect=True)
+        cursor=mydb.cursor(buffered=True)
+
+        #validation to check item already in cart
+        cursor.execute('select quantity from cart where itemid=uuid_to_bin(%s) and userid=uuid_to_bin(%s)',[itemid,userid])
+        cart_item=cursor.fetchone()
+        
+        if not cart_item:
+            return jsonify({"status":"failed","message":"Item Have to be in cart To remove"}),200
+        cursor.execute('delete from cart where itemid=uuid_to_bin(%s)and userid=uuid_to_bin(%s)',[itemid,userid])
+        mydb.commit()
+        return jsonify({"status":"success","message":"Item in cart deleted Successfully"}),200
+        
+    except Exception as e:
+            mydb.rollback()
+            print('Error:',str(e))
+            return jsonify({"status":"failed","message":f"{str(e)}"}),500
+    finally:
+        if cursor:
+            cursor.close()
 
 
 @app.route('/api/myorders')
 def myorders():
+    cursor=None
     #Dummy
-    print("Delete An item in Cart")
+    print("Viewing My orders")
     return jsonify({"status":"success","message":"Deleting Cart"}),200
 
 @app.route('/api/orders/<orderid>')
 def orderview(orderid):
     #Dummy
-    print("Delete An item in Cart")
+    print("Viewing the specic order")
     return jsonify({"status":"success","message":"Deleting Cart"}),200
 
 @app.route('/api/payment/create-order',methods=['POST'])
 def createpayment():
     #Dummy
-    print("Delete An item in Cart")
+    print("Payment Creating for that ammount")
     return jsonify({"status":"success","message":"Deleting Cart"}),200
 
 @app.route('/api/payment/verify',methods=['POST'])
 def paymentverify():
     #Dummy
-    print("Delete An item in Cart")
+    print("Verifying The payment")
     return jsonify({"status":"success","message":"Deleting Cart"}),200
 
 

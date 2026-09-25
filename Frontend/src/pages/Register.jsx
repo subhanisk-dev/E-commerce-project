@@ -72,7 +72,7 @@ function Register() {
   try {
     const url =
       role === "admin"
-        ? "http://localhost:5000/api/adminregister"
+        ? "http://localhost:5000/api/admin/register"
         : "http://localhost:5000/api/user/register";
 
     const payload =
@@ -82,7 +82,7 @@ function Register() {
             useremail: formData.useremail,
             useraddress: formData.useraddress,
             userpassword: formData.userpassword,
-            useragree: formData.useragree
+            useragree: formData.useragree ?"on" :"off"
           }
         : {
             username: formData.username,

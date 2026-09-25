@@ -18,3 +18,4 @@ def send_mail(to,subject,body):
         server.close()
     except Exception as e:
         print('Mail Error',e)
+        raise

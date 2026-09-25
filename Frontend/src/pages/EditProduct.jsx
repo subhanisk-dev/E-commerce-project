@@ -3,15 +3,11 @@ import axios from "axios";
 import { useParams, useNavigate } from "react-router-dom";
 
 function EditProduct() {
-
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // TOAST STATES
   const [showToast, setShowToast] = useState(false);
-
   const [toastMessage, setToastMessage] = useState("");
-
   const [toastType, setToastType] = useState("success");
 
   const [formData, setFormData] = useState({
@@ -20,19 +16,14 @@ function EditProduct() {
     About_item: "",
     quantity: "",
     price: "",
-    category: "",
+    category: ""
   });
 
   const [file, setFile] = useState(null);
 
-  // SHOW TOAST FUNCTION
-
   function showBootstrapToast(message, type = "success") {
-
     setToastMessage(message);
-
     setToastType(type);
-
     setShowToast(true);
 
     setTimeout(() => {
@@ -41,9 +32,7 @@ function EditProduct() {
   }
 
   async function getProduct() {
-
     try {
-
       const res = await axios.get(
         `http://localhost:5000/api/admin/item/${id}`,
         {
@@ -59,12 +48,13 @@ function EditProduct() {
         About_item: p.item_about,
         quantity: p.quantity,
         price: p.price,
-        category: p.category,
+        category: p.category
       });
 
     } catch (error) {
-
-      console.log(error.response?.data || error.message);
+      console.log(
+        error.response?.data || error.message
+      );
 
       showBootstrapToast(
         "Failed to load product",
@@ -78,19 +68,16 @@ function EditProduct() {
   }, []);
 
   function handleChange(e) {
-
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [e.target.name]: e.target.value
     });
   }
 
   async function handleSubmit(e) {
-
     e.preventDefault();
 
     try {
-
       const data = new FormData();
 
       data.append("title", formData.title);
@@ -112,7 +99,6 @@ function EditProduct() {
         }
       );
 
-      // SUCCESS TOAST
       showBootstrapToast(
         res.data.message || "Product Updated Successfully",
         "success"
@@ -123,10 +109,10 @@ function EditProduct() {
       }, 1500);
 
     } catch (error) {
+      console.log(
+        error.response?.data || error.message
+      );
 
-      console.log(error.response?.data || error.message);
-
-      // ERROR TOAST
       showBootstrapToast(
         error.response?.data?.message || "Update Failed",
         "danger"
@@ -136,114 +122,105 @@ function EditProduct() {
 
   return (
     <>
-      {/* CUSTOM STYLE */}
       <style>{`
         .edit-page{
-          min-height: 100vh;
-          background: #f1f5f9;
-          padding: 50px 20px;
-          display: flex;
-          justify-content: center;
-          align-items: center;
+          min-height:100vh;
+          background:#f1f5f9;
+          padding:50px 20px;
+          display:flex;
+          justify-content:center;
+          align-items:center;
         }
 
         .edit-card{
-          background: white;
-          width: 100%;
-          max-width: 750px;
-          border-radius: 20px;
-          padding: 40px;
-          box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+          background:white;
+          width:100%;
+          max-width:750px;
+          border-radius:20px;
+          padding:40px;
+          box-shadow:0 8px 20px rgba(0,0,0,0.1);
         }
 
         .edit-title{
-          text-align: center;
-          font-size: 38px;
-          font-weight: bold;
-          color: #0f172a;
-          margin-bottom: 35px;
+          text-align:center;
+          font-size:38px;
+          font-weight:bold;
+          color:#0f172a;
+          margin-bottom:35px;
         }
 
         .form-label{
-          color: #334155;
-          font-weight: 600;
+          color:#334155;
+          font-weight:600;
         }
 
         .form-control{
-          padding: 12px;
-          border-radius: 10px;
+          padding:12px;
+          border-radius:10px;
         }
 
         .update-btn{
-          width: 100%;
-          background: #0f172a;
-          color: white;
-          border: none;
-          padding: 14px;
-          border-radius: 10px;
-          font-size: 18px;
-          font-weight: 600;
-          transition: 0.3s;
+          width:100%;
+          background:#0f172a;
+          color:white;
+          border:none;
+          padding:14px;
+          border-radius:10px;
+          font-size:18px;
+          font-weight:600;
+          transition:0.3s;
         }
 
         .update-btn:hover{
-          background: #38bdf8;
+          background:#38bdf8;
         }
 
         .custom-toast{
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          z-index: 9999;
-          min-width: 320px;
-          border-radius: 12px;
+          position:fixed;
+          top:20px;
+          right:20px;
+          z-index:9999;
+          min-width:320px;
+          border-radius:12px;
         }
 
         @media(max-width:768px){
-
           .edit-card{
-            padding: 25px;
+            padding:25px;
           }
 
           .edit-title{
-            font-size: 30px;
+            font-size:30px;
           }
 
           .custom-toast{
-            right: 10px;
-            left: 10px;
-            min-width: auto;
+            right:10px;
+            left:10px;
+            min-width:auto;
           }
         }
       `}</style>
 
-      {/* TOAST */}
-
-      {
-        showToast && (
-          <div
-            className={`toast show align-items-center text-white bg-${toastType} border-0 custom-toast`}
-            role="alert"
-          >
-            <div className="d-flex">
-
-              <div className="toast-body">
-                {toastMessage}
-              </div>
-
-              <button
-                type="button"
-                className="btn-close btn-close-white me-2 m-auto"
-                onClick={() => setShowToast(false)}
-              ></button>
-
+      {showToast && (
+        <div
+          className={`toast show align-items-center text-white bg-${toastType} border-0 custom-toast`}
+          role="alert"
+        >
+          <div className="d-flex">
+            <div className="toast-body">
+              {toastMessage}
             </div>
+
+            <button
+              type="button"
+              className="btn-close btn-close-white me-2 m-auto"
+              onClick={() => setShowToast(false)}
+            ></button>
           </div>
-        )
-      }
+        </div>
+      )}
 
       <div className="edit-page">
-
         <div className="edit-card">
 
           <h1 className="edit-title">
@@ -253,7 +230,6 @@ function EditProduct() {
           <form onSubmit={handleSubmit}>
 
             <div className="mb-3">
-
               <label className="form-label">
                 Product Title
               </label>
@@ -265,12 +241,11 @@ function EditProduct() {
                 value={formData.title}
                 onChange={handleChange}
                 placeholder="Enter product title"
+                required
               />
-
             </div>
 
             <div className="mb-3">
-
               <label className="form-label">
                 Description
               </label>
@@ -282,12 +257,11 @@ function EditProduct() {
                 value={formData.Description}
                 onChange={handleChange}
                 placeholder="Enter product description"
+                required
               ></textarea>
-
             </div>
 
             <div className="mb-3">
-
               <label className="form-label">
                 About Product
               </label>
@@ -299,14 +273,13 @@ function EditProduct() {
                 value={formData.About_item}
                 onChange={handleChange}
                 placeholder="Enter about product"
+                required
               ></textarea>
-
             </div>
 
             <div className="row">
 
               <div className="col-md-6 mb-3">
-
                 <label className="form-label">
                   Quantity
                 </label>
@@ -318,12 +291,12 @@ function EditProduct() {
                   value={formData.quantity}
                   onChange={handleChange}
                   placeholder="Enter quantity"
+                  min="0"
+                  required
                 />
-
               </div>
 
               <div className="col-md-6 mb-3">
-
                 <label className="form-label">
                   Price
                 </label>
@@ -335,31 +308,57 @@ function EditProduct() {
                   value={formData.price}
                   onChange={handleChange}
                   placeholder="Enter price"
+                  min="0"
+                  step="0.01"
+                  required
                 />
-
               </div>
 
             </div>
 
             <div className="mb-3">
-
               <label className="form-label">
                 Category
               </label>
 
-              <input
-                type="text"
+              <select
                 className="form-control"
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
-                placeholder="Enter category"
-              />
+                required
+              >
+                <option value="">
+                  Select Category
+                </option>
 
+                <option value="home_appliences">
+                  🏠 Home Appliances
+                </option>
+
+                <option value="Grocery">
+                  🛒 Grocery
+                </option>
+
+                <option value="Fashion">
+                  👗 Fashion
+                </option>
+
+                <option value="Electronics">
+                  📱 Electronics
+                </option>
+
+                <option value="Sports">
+                  ⚽ Sports
+                </option>
+
+                <option value="Toys">
+                  🧸 Toys
+                </option>
+              </select>
             </div>
 
             <div className="mb-4">
-
               <label className="form-label">
                 Upload New Image
               </label>
@@ -367,9 +366,11 @@ function EditProduct() {
               <input
                 type="file"
                 className="form-control"
-                onChange={(e) => setFile(e.target.files[0])}
+                accept="image/*"
+                onChange={(e) =>
+                  setFile(e.target.files[0] || null)
+                }
               />
-
             </div>
 
             <button
@@ -382,7 +383,6 @@ function EditProduct() {
           </form>
 
         </div>
-
       </div>
     </>
   );
