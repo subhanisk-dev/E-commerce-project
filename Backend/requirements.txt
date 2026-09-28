@@ -4,3 +4,4 @@ python-dotenv
 mysql-connector-python
 flask_bcrypt
 flask_cors
+razorpay

@@ -8,7 +8,7 @@ from mysql.connector import connection
 from flask_bcrypt import Bcrypt
 from werkzeug.utils import secure_filename #It Remooves Unsafes characters from filename
 from flask_cors import CORS
-
+import razorpay
 
 import os
 import datetime
@@ -57,6 +57,10 @@ max_length=6*1024*1021 #6 MB
 app.config['UPLOAD_FOLDER']=upload_folder_path
 app.config['ALLOWED_EXTENSION']=Allowed_extensions
 app.config['MAX_CONTENT_LENGTH']=max_length
+
+#Creating an CLient 
+client=razorpay.Client(auth=(os.getenv('RAZORPAY_KEY_ID'),os.getenv('RAZORPAY_KEY_SECRET')))
+
 
 #DB CONNECTION
 mydb=connection.MySQLConnection(
@@ -917,16 +921,182 @@ def orderview(orderid):
 
 @app.route('/api/payment/create-order',methods=['POST'])
 def createpayment():
-    #Dummy
-    print("Payment Creating for that ammount")
-    return jsonify({"status":"success","message":"Deleting Cart"}),200
+    cursor=None
+    try:
+        userid=session.get('userid')
+        if not userid:
+            return jsonify({"status":"failed","message":"Pls Login First"}),401
+        data=request.get_json()
+        paymenttype=data.get('type')
+        mydb.ping(reconnect=True)
+        cursor=mydb.cursor(buffered=True)
+        if paymenttype=="cart":
+            cursor.execute('select bin_to_uuid(i.itemid),i.item_name,i.item_descrption,i.item_price,c.quantity,i.item_category,i.item_image from items i join cart c on i.itemid=c.itemid where c.userid=uuid_to_bin(%s)',[userid])
+            cart_items=cursor.fetchall()
+        else:
+            itemid=data.get('itemid')
+            quantity=data.get('quantity',1)
+            cursor.execute('select bin_to_uuid(itemid),item_name,item_descrption,item_price,item_stock,item_category,item_image from items where itemid=uuid_to_bin(%s)',[itemid])
+            item_data=cursor.fetchone()
+            print(item_data)
+            if not item_data:
+                return jsonify({"status":"failed","message":"no item found"}),401
+            if item_data[4]<quantity:
+                return jsonify({"status":"failed","message":"Item Qunatity excedded the stock"}),404
+            cart_items=[(item_data[0],item_data[1],item_data[2],item_data[3],quantity,item_data[5],item_data[6])]
+        if not cart_items:
+            return jsonify({"status":"failed","message":"no item found"}),401
+        items_data=[]
+        subtotal=0
+        for item in cart_items:
+            itemid=item[0]
+            itemname=item[1]
+            price=float(item[3])
+            quantity=int(item[4])
+            category=item[5]
+            image=url_for('static',filename=f"uploads/{item[6]}",_external=True)
+            amount=price*quantity
+            subtotal+=amount
+            items_data.append({"itemid":itemid,
+                               "itemname":itemname,
+                               "price":price,
+                               "quantity":quantity,
+                               "category":category,
+                               "image":image,
+                               "total":amount
+                               })
+
+        delivery=40
+        tax=round(subtotal*0.05,2)
+        grand_total=subtotal+delivery+tax
+        summary={"subtotal":subtotal,"delivery":delivery,"grand_total":grand_total,"tax":tax}
+
+        #Creating payment
+        razorpay_amount=grand_total*100
+        order=client.order.create({
+            "amount":razorpay_amount,
+            "currency":"INR",
+            "receipt":session.get('useremail'),
+            "payment_capture":1
+        })
+
+        return jsonify({"status":"success","message":"payment-order-created successfulyy",
+                        "order":{"order_id":order['id'],"amount":order['amount'],"currency":order['currency']},
+                        "summary":summary,"cart_items":items_data,"razorpay_key":os.getenv('RAZORPAY_KEY_ID')}),200
+
+    except Exception as e:
+        print("Error",e)
+        return jsonify({"status":"failed","message":f"{str(e)}"}),500
+
 
 @app.route('/api/payment/verify',methods=['POST'])
-def paymentverify():
-    #Dummy
-    print("Verifying The payment")
-    return jsonify({"status":"success","message":"Deleting Cart"}),200
+def verify_payment():
+    cursor = None
+    try:
+        data = request.get_json()
+        payment_id = data.get('razorpay_payment_id')
+        order_id = data.get('razorpay_order_id')
+        signature = data.get('razorpay_signature')
+        mode = data.get('mode','cart')
+        params_dict = {
+            'razorpay_order_id': order_id,
+            'razorpay_payment_id': payment_id,
+            'razorpay_signature': signature
+        }
+        try:
+            client.utility.verify_payment_signature(params_dict)
+        except Exception as e:
+            print(e)
+            return jsonify({'status': 'failed','message': 'Payment verification failed'}), 400
+        if 'userid' not in session:
+            return jsonify({'status': 'failed','message': 'Please login first'}), 401
+        
+        # reconnect automatically if mysql connection lost
+        mydb.ping(reconnect=True)
+        cursor = mydb.cursor(buffered=True)
+        userid = session.get('userid')
+        if mode == 'cart':
+            cursor.execute('select bin_to_uuid(i.itemid),i.item_name,i.item_descrption,i.item_price,c.quantity,i.item_category,i.item_image from items i inner join cart c on i.itemid=c.itemid where c.userid=uuid_to_bin(%s)',[userid])
+            cart_items = cursor.fetchall()
+        # SINGLE BUY
+        else:
+            itemid = data.get('itemid')
+            quantity = int(
+                data.get('quantity', 1)
+            )
+            cursor.execute('select bin_to_uuid(i.itemid),i.item_name,i.item_descrption,i.item_price,i.item_stock,i.item_category,i.item_image from items i where i.itemid=uuid_to_bin(%s)',[itemid])
+            item = cursor.fetchone()
+            if not item:
+                return jsonify({'status': 'failed','message': 'Item not found'}), 404
+            available_stock = item[4]
+            if quantity > available_stock:
+                return jsonify({'status': 'failed','message': 'Insufficient stock'}), 400
+            cart_items = [(item[0],item[1],item[2],item[3],quantity,item[5],item[6])]
+        # EMPTY CHECK
+        if not cart_items:
+            return jsonify({'status': 'failed','message': 'Cart empty'}), 404
+        # CALCULATE TOTAL
+        subtotal = 0
+        for item in cart_items:
+            item_price = float(item[3])
+            item_quantity = int(item[4])
+            subtotal += (item_price * item_quantity)
+        delivery = 40
+        tax = round(subtotal * 0.05, 2)
+        grand_total = subtotal + delivery + tax
+        # STORE ORDER
+        cursor.execute('''INSERT INTO orders(razorpay_ordid,razorpay_payment,userid,total_amount,delivery,tax,grand_total) VALUES(%s,%s,uuid_to_bin(%s),%s,%s,%s,%s)''',[order_id,payment_id,userid,subtotal,delivery,tax,grand_total])
+        order_table_id = cursor.lastrowid
+        # STORE ORDER ITEMS
+        insert_item_query = '''INSERT INTO order_details(orderid,itemid,item_name,item_price,item_quantity,sub_total,item_category,item_image) VALUES(%s,uuid_to_bin(%s),%s,%s,%s,%s,%s,%s)'''
+        ordered_items = []
+        for item in cart_items:
+            itemid = item[0]
+            item_name = item[1]
+            item_price = float(item[3])
+            item_quantity = int(item[4])
+            item_category = item[5]
+            item_img = item[6]
+            amount = item_price * item_quantity
+            cursor.execute(insert_item_query,[order_table_id,str(itemid),item_name,item_price,item_quantity,amount,item_category,item_img])
+            # reduce stock
+            cursor.execute('''UPDATE items SET item_stock = item_stock - %s WHERE itemid=uuid_to_bin(%s)''',[item_quantity, itemid])
+            ordered_items.append({'itemid': itemid,'itemname': item_name,'price': item_price,
+                'quantity': item_quantity,'subtotal': amount
+                })
 
+        # CLEAR CART
+        if mode == 'cart':
+            cursor.execute('''DELETE FROM cart WHERE userid=uuid_to_bin(%s)''',[userid])
+        mydb.commit()
+        # SUCCESS RESPONSE
+        return jsonify({
+            'status': 'success',
+            'message': 'Payment verified successfully',
+            'payment': {
+                'payment_id': payment_id,
+                'order_id': order_id
+            },
+            'summary': {
+                'subtotal': subtotal,
+                'delivery': delivery,
+                'tax': tax,
+                'grand_total': grand_total
+            },
+            'ordered_items': ordered_items
+        })
+
+    except Exception as e:
+        mydb.rollback()
+        print(e)
+        return jsonify({
+            'status': 'failed',
+            'message': str(e)
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
 
 @app.route('/api/invoice/<orderid>',methods=['GET'])
 def inovice():
