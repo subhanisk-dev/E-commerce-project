@@ -1,6 +1,6 @@
 #Importing modules from Packages
 
-from flask import Flask,request,url_for,jsonify,session
+from flask import Flask,request,url_for,jsonify,session,make_response
 from flask_session import Session
 from otp import generate_otp
 from cmail import send_mail
@@ -11,9 +11,26 @@ from flask_cors import CORS
 import razorpay
 
 import os
+import re
 import datetime
 from dotenv import load_dotenv
 load_dotenv()
+
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Table,
+    TableStyle,
+    Paragraph,
+    Spacer
+)
+
+from io import BytesIO
+
+
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus.flowables import HRFlowable
 
 #Finding path if present else creating folders
 base_dir=os.path.dirname(os.path.abspath(__file__))
@@ -821,7 +838,6 @@ def viewcart():
         if cursor:
             cursor.close()
 
-
 @app.route('/api/cart/update',methods=['PUT'])
 def updatecart():
     cursor=None
@@ -905,19 +921,102 @@ def deletecart(itemid):
         if cursor:
             cursor.close()
 
-
-@app.route('/api/myorders')
+@app.route('/api/myorders',methods=['GET'])
 def myorders():
-    cursor=None
-    #Dummy
-    print("Viewing My orders")
-    return jsonify({"status":"success","message":"Deleting Cart"}),200
+    cursor = None
+    try:
+        # check login
+        if 'userid' not in session:
+            return jsonify({"status": "failed","message": "Please login first"}), 401
 
-@app.route('/api/orders/<orderid>')
-def orderview(orderid):
-    #Dummy
-    print("Viewing the specic order")
-    return jsonify({"status":"success","message":"Deleting Cart"}),200
+        # reconnect automatically if mysql connection lost
+        mydb.ping(reconnect=True)
+        cursor = mydb.cursor(buffered=True)
+        userid = session.get('userid')
+
+        # fetch all orders
+        cursor.execute(
+            '''
+            SELECT
+                orderid,
+                razorpay_ordid,
+                razorpay_payment,
+                total_amount,
+                delivery,
+                tax,
+                grand_total
+                FROM orders
+            WHERE userid=uuid_to_bin(%s)
+            ''',
+            [userid]
+        )
+
+        orders = cursor.fetchall()
+        all_orders = []
+        for order in orders:
+            orderid = order[0]
+            # fetch ordered items
+            cursor.execute(
+                '''
+                SELECT
+                    BIN_TO_UUID(itemid),
+                    item_name,
+                    item_price,
+                    item_quantity,
+                    sub_total,
+                    item_category,
+                    item_image
+                FROM order_details                                                                        
+                WHERE orderid=%s
+                ''',
+                [orderid]
+            )
+
+            items = cursor.fetchall()
+            order_items = []
+            for item in items:
+                image_url = url_for(
+                    'static',
+                    filename=f'uploads/{item[6]}',
+                    _external=True
+                )
+
+                order_items.append({
+                    'itemid': item[0],
+                    'itemname': item[1],
+                    'price': float(item[2]),
+                    'quantity': item[3],
+                    'subtotal': float(item[4]),
+                    'category': item[5],
+                    'image': image_url
+                })
+
+
+            all_orders.append({
+                "orderid": orderid,
+                "razorpay_order_id": order[1],
+                "razorpay_payment_id": order[2],
+                "subtotal": float(order[3]),
+                "delivery": float(order[4]),
+                "tax": float(order[5]),
+                "grand_total": float(order[6]),
+                "items": order_items
+            })
+
+        return jsonify({
+            "status": "success",
+            "orders": all_orders
+        })
+    except Exception as e:
+        print("MYSQL ERROR:", str(e))
+        return jsonify({
+            "status": "failed",
+            "message": "Could not fetch orders"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
 
 @app.route('/api/payment/create-order',methods=['POST'])
 def createpayment():
@@ -987,7 +1086,6 @@ def createpayment():
     except Exception as e:
         print("Error",e)
         return jsonify({"status":"failed","message":f"{str(e)}"}),500
-
 
 @app.route('/api/payment/verify',methods=['POST'])
 def verify_payment():
@@ -1098,11 +1196,309 @@ def verify_payment():
         if cursor:
             cursor.close()
 
-@app.route('/api/invoice/<orderid>',methods=['GET'])
-def inovice():
-    #Dummy
-    print("Delete An item in Cart")
-    return jsonify({"status":"success","message":"Deleting Cart"}),200
+@app.route('/api/orders/<ordid>',methods=['GET'])
+def myorder_details(ordid):
+    cursor = None
+    try:
+        # ---------------- LOGIN CHECK ----------------
+        if 'userid' not in session:
+            return jsonify({
+                'status': 'failed',
+                'message': 'Please login first'
+            }), 401
+
+        # reconnect automatically if mysql connection lost
+        mydb.ping(reconnect=True)
+        cursor = mydb.cursor(buffered=True)
+        userid = session.get('userid')
+        print(userid)
+
+        # ---------------- GET ORDER DETAILS ----------------
+        cursor.execute(
+            '''
+            SELECT
+                orderid,
+                razorpay_ordid,
+                razorpay_payment,
+                total_amount,
+                delivery,
+                tax,
+                grand_total
+            FROM orders
+            WHERE userid=uuid_to_bin(%s)
+            AND orderid=%s
+            ''',
+            [userid, ordid]
+        )
+        order_data = cursor.fetchone()
+
+        if not order_data:
+            return jsonify({
+                'status': 'failed',
+                'message': 'Order not found'
+            }), 404
+
+        # ---------------- GET ORDER ITEMS ----------------
+        cursor.execute(
+            '''
+            SELECT
+                order_detailsid,
+                orderid,
+                BIN_TO_UUID(itemid),
+                item_name,
+                item_price,
+                item_quantity,
+                sub_total,
+                item_category,
+                item_image
+            FROM order_details
+            WHERE orderid=%s
+            ''',
+            [ordid]
+        )
+
+        orders_itemsdata = cursor.fetchall()
+        # ---------------- FORMAT ORDER ----------------
+        order_json = {
+            'orderid': order_data[0],
+            'razorpay_order_id': order_data[1],
+            'razorpay_payment_id': order_data[2],
+            'total_amount': float(order_data[3]),
+            'delivery': float(order_data[4]),
+            'tax': float(order_data[5]),
+            'grand_total': float(order_data[6])
+        }
+
+        # ---------------- FORMAT ITEMS ----------------
+        items_json = []
+        for item in orders_itemsdata:
+            image_url = url_for(
+                'static',
+                filename=f'uploads/{item[8]}',
+                _external=True
+            )
+
+
+            items_json.append({
+                'order_details_id': item[0],
+                'order_id': item[1],
+                'itemid': item[2],
+                'item_name': item[3],
+                'item_price': float(item[4]),
+                'item_quantity': int(item[5]),
+                'subtotal': float(item[6]),
+                'item_category': item[7],
+                'item_image': image_url
+            })
+
+        # ---------------- FINAL RESPONSE ----------------
+        return jsonify({
+            'status': 'success',
+            'order': order_json,
+            'items': items_json
+        })
+    
+    except Exception as e:
+        print(f'Order Details Error: {e}')
+        return jsonify({
+            'status': 'failed',
+            'message': str(e)
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+@app.route('/api/invoice/<int:ord_id>',methods=['GET'])
+def get_invoice(ord_id):
+    cursor = None
+    try:
+        userid = session.get('userid')
+        # ---------------- LOGIN CHECK ----------------
+        if not userid:
+            return jsonify({
+                'status': 'failed',
+                'message': 'Please login first'
+            }), 401
+
+        # reconnect automatically if mysql connection lost
+        mydb.ping(reconnect=True)
+        cursor = mydb.cursor(buffered=True)
+
+        # ---------------- GET ORDER ----------------
+        cursor.execute(
+            '''
+            SELECT
+                orderid,
+                razorpay_ordid,
+                razorpay_payment,
+                total_amount,
+                delivery,
+                tax,
+                grand_total         
+            FROM orders
+            WHERE userid=uuid_to_bin(%s)
+            AND orderid=%s
+            ''',
+            [userid, ord_id]
+        )
+
+        order_data = cursor.fetchone()
+        if not order_data:
+            return jsonify({
+                'status': 'failed',
+                'message': 'Order not found'
+            }), 404
+        
+        # ---------------- GET ORDER ITEMS ----------------
+        cursor.execute(
+            '''
+            SELECT
+                item_name,
+                item_price,
+                item_quantity,
+                sub_total,
+                item_category
+            FROM order_details
+            WHERE orderid=%s
+            ''',
+            [ord_id]
+        )
+        order_items = cursor.fetchall()
+
+        # ---------------- CREATE PDF BUFFER ----------------
+        pdf_buffer = BytesIO()
+
+        # ---------------- CREATE DOCUMENT ----------------
+        doc = SimpleDocTemplate(
+            pdf_buffer,
+            pagesize=A4,
+            rightMargin=30,
+            leftMargin=30,
+            topMargin=30,
+            bottomMargin=20
+        )
+
+        styles = getSampleStyleSheet()
+
+        elements = []
+
+        # ---------------- TITLE ----------------
+        title = Paragraph(
+            "<b>BUYROUTE INVOICE</b>",
+            styles['Title']
+        )
+
+        elements.append(title)
+        elements.append(Spacer(1, 15))
+
+        # ---------------- ORDER DETAILS ----------------
+        order_info = f"""
+        <b>Order ID:</b> {order_data[0]} <br/>
+        <b>Razorpay Order ID:</b> {order_data[1]} <br/>
+        <b>Payment ID:</b> {order_data[2]} <br/>
+        """
+
+        order_para = Paragraph(
+            order_info,
+            styles['BodyText']
+        )
+        elements.append(order_para)
+        elements.append(Spacer(1, 10))
+        elements.append(HRFlowable(width="100%"))
+        elements.append(Spacer(1, 15))
+
+        # ---------------- TABLE DATA ----------------
+        table_data = [[
+            'Item Name',
+            'Category',
+            'Price',
+            'Quantity',
+            'Subtotal'
+        ]]
+
+        for item in order_items:
+            table_data.append([
+                item[0][0:10],
+                item[4],
+                f"${float(item[1])}",
+                str(item[2]),
+                f"${float(item[3])}"
+            ])
+
+        # ---------------- CREATE TABLE ----------------
+        table = Table(
+            table_data,
+                              colWidths=[180, 100, 80, 70, 80]
+        )
+
+
+        # ---------------- TABLE STYLE ----------------
+        table.setStyle(
+            TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0d6efd')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('ALIGN', (2, 1), (-1, -1), 'CENTER')
+            ])
+        )
+
+        elements.append(table)
+        elements.append(Spacer(1, 20))
+
+        # ---------------- SUMMARY ----------------
+        summary = f"""
+        <b>Items Total:</b> ${float(order_data[3])}<br/><br/>
+        <b>Delivery:</b> ${float(order_data[4])}<br/><br/>
+        <b>Tax:</b> ${float(order_data[5])}<br/><br/>
+        <b>Grand Total:</b> ${float(order_data[6])}
+        """
+        summary_para = Paragraph(
+            summary,
+            styles['Heading3']
+        )
+
+        elements.append(summary_para)
+        elements.append(Spacer(1, 25))
+
+        # ---------------- FOOTER ----------------
+        footer = Paragraph(
+            "Thank you for shopping with BUYROUTE",
+            styles['Italic']
+        )
+
+        elements.append(footer)
+
+        # ---------------- BUILD PDF ----------------
+        doc.build(elements)
+        pdf_buffer.seek(0)
+
+        # ---------------- RESPONSE ----------------
+        response = make_response(
+            pdf_buffer.getvalue()
+        )
+
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = (
+            f'attachment; filename=invoice_{ord_id}.pdf'
+        )
+
+        return response
+
+    except Exception as e:
+        print(f'Invoice Error: {e}')
+        return jsonify({
+            'status': 'failed',
+            'message': str(e)
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
 
 
 @app.errorhandler(413)
@@ -1111,14 +1507,12 @@ def file_too_large(error):
 
 @app.route('/api/user/session', methods=['GET'])
 def check_user_session():
-
     return jsonify({
         "status": "success",
         "logged_in": bool(session.get('userid')),
         "userid": session.get('userid'),
         "email": session.get('user_email')
     }), 200
-
 
 
 #App Run

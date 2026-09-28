@@ -5,3 +5,4 @@ mysql-connector-python
 flask_bcrypt
 flask_cors
 razorpay
+reportlab
