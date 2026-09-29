@@ -77,7 +77,6 @@ const admin = JSON.parse(
             User Dashboard
           </h1>
 
-
 <h3 className="welcome-text">
   Welcome: {admin?.adminemail}
 </h3>

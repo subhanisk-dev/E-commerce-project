@@ -156,7 +156,6 @@ function Products() {
 
         <div className="container">
           <div className="row g-4">
-
             {filteredProducts.map((v) => (
 
               <div

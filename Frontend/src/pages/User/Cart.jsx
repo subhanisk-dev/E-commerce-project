@@ -7,7 +7,6 @@ function Cart() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-
   const navigate = useNavigate();
 
   async function fetchCart() {

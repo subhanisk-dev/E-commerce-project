@@ -245,8 +245,7 @@ function Register() {
       <div className="register-page">
 
         <div className="register-card">
-
-         
+    
   <h1 className="register-title">
     Create Account
   </h1>

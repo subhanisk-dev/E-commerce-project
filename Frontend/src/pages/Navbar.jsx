@@ -230,27 +230,27 @@ function Navbar() {
                       </Link>
                     </li>
                     <li>
-                      <Link className="dropdown-item" to="/produce?category=Grocery">
+                      <Link className="dropdown-item" to="/produce?categorygrocery">
                         🛒 Grocery
                       </Link>
                     </li>
                     <li>
-                      <Link className="dropdown-item" to="/produce?category=Fashion">
+                      <Link className="dropdown-item" to="/produce?category=fashion">
                         👗 Fashion
                       </Link>
                     </li>
                     <li>
-                      <Link className="dropdown-item" to="/produce?category=Electronics">
+                      <Link className="dropdown-item" to="/produce?category=electronics">
                         📱 Electronics
                       </Link>
                     </li>
                     <li>
-                      <Link className="dropdown-item" to="/produce?category=Sports">
+                      <Link className="dropdown-item" to="/produce?category=sports">
                         ⚽ Sports
                       </Link>
                     </li>
                     <li>
-                      <Link className="dropdown-item" to="/produce?category=Toys">
+                      <Link className="dropdown-item" to="/produce?category=toys">
                         🧸 Toys
                       </Link>
                     </li>

@@ -72,7 +72,6 @@ function Payment() {
             alert("Payment verification failed");
           }
         },
-
         theme: {
           color: "#0f172a"
         }

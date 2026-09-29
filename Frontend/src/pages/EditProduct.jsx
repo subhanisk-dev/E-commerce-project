@@ -381,7 +381,6 @@ function EditProduct() {
             </button>
 
           </form>
-
         </div>
       </div>
     </>

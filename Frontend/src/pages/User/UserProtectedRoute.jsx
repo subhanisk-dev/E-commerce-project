@@ -6,4 +6,5 @@ function UserProtectedRoute({ children }) {
   return user ? children : <Navigate to="/login" replace />;
 }
 
+
 export default UserProtectedRoute;

@@ -202,4 +202,5 @@ console.log(res.data.product)
   );
 }
 
+
 export default SingleProduct;

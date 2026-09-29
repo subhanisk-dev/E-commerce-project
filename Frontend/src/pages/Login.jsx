@@ -422,6 +422,13 @@ function Login() {
 
           </div>
 
+          <div className="register-link">
+            Forgot Password ? {" "}
+            <Link to="/forgot">
+              Reset Password
+            </Link>
+          </div>
+
         </div>
 
       </div>

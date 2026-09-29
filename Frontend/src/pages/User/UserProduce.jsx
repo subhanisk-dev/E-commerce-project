@@ -15,11 +15,11 @@ function UserProduce() {
   const categories = [
   { label: "All",              value: "All" },
   { label: "Home Appliances",  value: "home_appliences" },
-  { label: "Grocery",          value: "Grocery" },
-  { label: "Fashion",          value: "Fashion" },
-  { label: "Electronics",      value: "Electronics" },
-  { label: "Sports",           value: "Sports" },
-  { label: "Toys",             value: "Toys" },
+  { label: "Grocery",          value: "grocery" },
+  { label: "Fashion",          value: "fashion" },
+  { label: "Electronics",      value: "electronics" },
+  { label: "Sports",           value: "sports" },
+  { label: "Toys",             value: "toys" },
 ];
 
   async function fetchProducts() {

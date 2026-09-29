@@ -32,6 +32,9 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus.flowables import HRFlowable
 
+from stoken import (endata,dndata)
+
+
 #Finding path if present else creating folders
 base_dir=os.path.dirname(os.path.abspath(__file__))
 upload_folder_path=os.path.join(base_dir,'static','uploads')
@@ -1500,6 +1503,60 @@ def get_invoice(ord_id):
         if cursor:
             cursor.close()
 
+
+@app.route('/api/user/forgot',methods=['POST'])
+def forgotpassword():
+    cursor=None
+    try:
+        forgotemail=request.get_json().get('useremail')
+        mydb.ping(reconnect=True)
+        cursor=mydb.cursor(buffered=True)
+        cursor.execute('select account_status from userdata where useremail=%s',[forgotemail])
+        user_data=cursor.fetchone()
+        if not user_data:
+            return jsonify({"status":"failed","message":"User Not Found"})
+        if user_data[0] in ['inactive','suspended']:
+            return jsonify({"status":"failed","message":"User Inactive or Suspended"})
+        if user_data[0]=='active':
+            subject="Resset Password Using Link"
+            resetlink=f"Use this Link to password update {url_for('newpassword',data=endata(forgotemail),_external=True)}"
+            send_mail(to=forgotemail,subject=subject,body=resetlink)
+            return jsonify({"status":"success","message":"Link Sended Success Fully"})
+    except Exception as e:
+        print("Error",e)
+        return jsonify({"status":"failed","message":f"{str(e)}"})
+    finally:
+        if cursor:
+            cursor.close()
+
+@app.route('/newpassword/<data>',methods=['PUT'])
+def newpassword(data):
+    cursor=None
+    try:
+        email=dndata(data)
+        newpassword=request.get_json().get('npassword')
+        confirmpassword=request.get_json().get('cpassword')
+        hashed_password=bcrypt.generate_password_hash(newpassword).decode('utf-8')
+        if newpassword!=confirmpassword:
+            return jsonify({"status":"failed","message":"password dose not match"})
+        mydb.ping(reconnect=True)
+        cursor=mydb.cursor(buffered=True)
+        cursor.execute('select account_status from userdata where useremail=%s',[email])
+        user_data=cursor.fetchone()
+        if not user_data:
+            return jsonify({"status":"failed","message":"user not Found"})
+        if user_data[0]=='inactive':
+            return jsonify({"status":"failed","message":"pls register again"})
+        if user_data[0]=='active':
+            cursor.execute('update userdata set userpassword=%s where useremail=%s',[hashed_password,email])
+            mydb.commit()
+            return jsonify({"status":"success","message":"Password updated successfully"})
+    except Exception as e:
+        print(f'Invoice Error: {e}')
+        return jsonify({'status': 'failed','message': str(e)}), 500
+    finally:   
+        if cursor:
+            cursor.close()
 
 @app.errorhandler(413)
 def file_too_large(error):

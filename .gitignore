@@ -2,6 +2,7 @@ Backend/__pycache__
 Backend/ecomenv
 Backend/.env
 Backend/flask_session
-
+Backend/ecomenv
 Frontend/node_modules
 Frontend/package-lock.json
+Backend/__pycache__

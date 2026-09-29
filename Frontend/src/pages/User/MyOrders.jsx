@@ -59,31 +59,29 @@ function MyOrders() {
                                     Status: {order?.status || "Completed"}
                                 </p>
 
-                              <div className="row">
-                                <div className="col-3">
-                                  <button
-                                    className="btn btn-primary btn-sm mb-2"
-                                    onClick={() =>
-                                        navigate(`/order/${order.orderid}`)
-                                    }
-                                >
-                                    View Details
-                                </button>
+                                <div className="row">
+                                    <div className="col-3">
+                                        <button
+                                            className="btn btn-primary btn-sm mb-2"
+                                            onClick={() =>
+                                                navigate(`/order/${order.orderid}`)
+                                            }
+                                        >
+                                            View Details
+                                        </button>
 
-                               
-
+                                    </div>
+                                    <div className="col-3">
+                                        <a
+                                            className="btn btn-success btn-sm"
+                                            href={`http://localhost:5000/api/invoice/${order.orderid}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                        >
+                                            Download Invoice
+                                        </a>
+                                    </div>
                                 </div>
-                                <div className="col-3">
-                                     <a
-                                    className="btn btn-success btn-sm"
-                                    href={`http://localhost:5000/api/invoice/${order.orderid}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                >
-                                    Download Invoice
-                                </a>
-                                </div>
-                              </div>
                             </div>
 
                         </div>

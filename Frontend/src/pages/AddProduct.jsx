@@ -28,7 +28,6 @@ function AddProduct() {
     setToastMessage(message);
     setToastType(type);
     setShowToast(true);
-
     setTimeout(() => {
       setShowToast(false);
     }, 3000);
